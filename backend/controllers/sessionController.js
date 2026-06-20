@@ -1,0 +1,94 @@
+import Session from '../models/Session.js';
+
+const calculateTotalVolume = (exercises) => {
+  let total = 0;
+  for (const exercise of exercises) {
+    for (const set of exercise.sets) {
+      total += set.reps * set.weight;
+    }
+  }
+  return total;
+};
+
+export const createSession = async (req, res) => {
+  try {
+    const { name, date, exercises } = req.body;
+
+    if (!name || !exercises || exercises.length === 0) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        message: 'Session name and at least one exercise are required',
+      });
+    }
+
+    const totalVolume = calculateTotalVolume(exercises);
+
+    const session = await Session.create({
+      userId: req.user._id,
+      name,
+      date: date || Date.now(),
+      exercises,
+      totalVolume,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { session },
+      message: 'Session created successfully',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      data: null,
+      message: error.message,
+    });
+  }
+};
+
+export const getSessions = async (req, res) => {
+  try {
+    const sessions = await Session.find({ userId: req.user._id }).sort({ date: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: { sessions },
+      message: '',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      data: null,
+      message: error.message,
+    });
+  }
+};
+
+export const getSessionById = async (req, res) => {
+  try {
+    const session = await Session.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        message: 'Session not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { session },
+      message: '',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      data: null,
+      message: error.message,
+    });
+  }
+};

@@ -33,4 +33,11 @@ export const protect = async(req,res,next)=>{
     }
 
     }
+    export const getMe = async (req, res) => {
+    res.status(200).json({
+        success: true,
+        data: { user: req.user },
+        message: '',
+    });
+    };
 
