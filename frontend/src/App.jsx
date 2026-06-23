@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { useAuth } from './hooks/useAuth';
-import Login from './pages/Login';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./hooks/useAuth";
+import Login from "./pages/Login";
+import NewSession from "./pages/NewSession";
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -24,7 +25,9 @@ function ProtectedRoute({ children }) {
 function TempDashboard() {
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center">
-      <h1 className="text-3xl font-bold">Dashboard placeholder — you're logged in</h1>
+      <h1 className="text-3xl font-bold">
+        Dashboard placeholder — you're logged in
+      </h1>
     </div>
   );
 }
@@ -42,6 +45,14 @@ function AppRoutes() {
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="/new-session"
+        element={
+          <ProtectedRoute>
+            <NewSession />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
