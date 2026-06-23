@@ -3,6 +3,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/Login";
 import NewSession from "./pages/NewSession";
+import SessionDetail from "./pages/SessionDetail";
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -50,6 +51,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <NewSession />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/session/:id"
+        element={
+          <ProtectedRoute>
+            <SessionDetail />
           </ProtectedRoute>
         }
       />

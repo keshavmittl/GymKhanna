@@ -87,6 +87,42 @@ export default function NewSession() {
       }),
     );
   };
+
+  const handleSubmit = async () => {
+    if (!sessionName.trim()) {
+      alert("Please name your session");
+      return;
+    }
+    if (selectedExercises.length === 0) {
+      alert("Add at least one exercise");
+      return;
+    }
+
+    const cleanedExercises = selectedExercises.map((ex) => ({
+      exerciseId: ex.exerciseId,
+      name: ex.name,
+      sets: ex.sets.map((set) => ({
+        reps: Number(set.reps) || 0,
+        weight: Number(set.weight) || 0,
+        completed: set.completed,
+      })),
+    }));
+
+    setSubmitting(true);
+    try {
+      const response = await createSession({
+        name: sessionName,
+        exercises: cleanedExercises,
+      });
+      const sessionId = response.data.data.session._id;
+      navigate(`/session/${sessionId}`);
+    } catch (error) {
+      console.error("Failed to save session:", error);
+      alert("Failed to save session. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
   const isSelected = (id) => selectedExercises.some((e) => e.exerciseId === id);
 
   if (loadingExercises) {
@@ -237,6 +273,13 @@ export default function NewSession() {
             ))}
           </div>
         </div>
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="fixed bottom-6 right-6 bg-[#e0322f] hover:bg-[#c92825] disabled:opacity-50 text-white font-bold px-6 py-3.5 rounded-full shadow-lg shadow-[#e0322f]/20 transition-colors"
+        >
+          {submitting ? "Saving…" : "Save Session"}
+        </button>
       </div>
     </div>
   );
