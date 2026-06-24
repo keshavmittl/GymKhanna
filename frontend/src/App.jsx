@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import NewSession from "./pages/NewSession";
 import SessionDetail from "./pages/SessionDetail";
 import BodyWeight from "./pages/BodyWeight";
+import Dashboard from './pages/Dashboard';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -24,16 +25,6 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-function TempDashboard() {
-  return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center">
-      <h1 className="text-3xl font-bold">
-        Dashboard placeholder — you're logged in
-      </h1>
-    </div>
-  );
-}
-
 function AppRoutes() {
   return (
     <Routes>
@@ -42,7 +33,7 @@ function AppRoutes() {
         path="/"
         element={
           <ProtectedRoute>
-            <TempDashboard />
+            <Dashboard />
           </ProtectedRoute>
         }
       />

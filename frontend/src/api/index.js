@@ -19,3 +19,7 @@ export const createExercise = (data) => client.post('/exercises', data);
 export const logWeight = (data) => client.post('/bodyweight', data);
 export const getWeightHistory = () => client.get('/bodyweight');
 export const setGoalWeight = (data) => client.put('/bodyweight/goal', data);
+
+// Water
+export const logWater = (data) => client.post('/water', data);
+export const getTodayWater = () => client.get('/water/today');
