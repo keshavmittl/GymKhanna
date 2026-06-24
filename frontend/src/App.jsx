@@ -4,6 +4,7 @@ import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/Login";
 import NewSession from "./pages/NewSession";
 import SessionDetail from "./pages/SessionDetail";
+import BodyWeight from "./pages/BodyWeight";
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -59,6 +60,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SessionDetail />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/bodyweight"
+        element={
+          <ProtectedRoute>
+            <BodyWeight />
           </ProtectedRoute>
         }
       />

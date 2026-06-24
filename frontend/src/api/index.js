@@ -14,3 +14,8 @@ export const deleteSession = (id) => client.delete(`/sessions/${id}`);
 // Exercises
 export const getExercises = () => client.get('/exercises');
 export const createExercise = (data) => client.post('/exercises', data);
+
+// Body Weight
+export const logWeight = (data) => client.post('/bodyweight', data);
+export const getWeightHistory = () => client.get('/bodyweight');
+export const setGoalWeight = (data) => client.put('/bodyweight/goal', data);
