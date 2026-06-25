@@ -52,6 +52,14 @@ const sessionSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    prs: [
+  {
+    exerciseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Exercise' },
+    name: String,
+    newWeight: Number,
+    previousBest: Number,
+  },
+],
   },
   { timestamps: true }
 );

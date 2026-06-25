@@ -1,5 +1,7 @@
 import Session from '../models/Session.js';
-
+import { findPRsForSession ,getAllTimePRs} from '../services/prEngine.js';
+import User from '../models/User.js';
+import { updateStreak } from '../services/streakEngine.js';
 const calculateTotalVolume = (exercises) => {
   let total = 0;
   for (const exercise of exercises) {
@@ -24,17 +26,29 @@ export const createSession = async (req, res) => {
 
     const totalVolume = calculateTotalVolume(exercises);
 
+    const pastSessions = await Session.find({ userId: req.user._id });
+    const prs = findPRsForSession(exercises, pastSessions);
+
     const session = await Session.create({
       userId: req.user._id,
       name,
       date: date || Date.now(),
       exercises,
       totalVolume,
+      prs,
+    });
+
+    const allSessionsIncludingNew = [...pastSessions, session];
+    const streakUpdate = updateStreak(req.user, allSessionsIncludingNew);
+
+    await User.findByIdAndUpdate(req.user._id, {
+      currentStreak: streakUpdate.currentStreak,
+      lastStreakWeek: streakUpdate.lastStreakWeek,
     });
 
     res.status(201).json({
       success: true,
-      data: { session },
+      data: { session, streak: streakUpdate.currentStreak },
       message: 'Session created successfully',
     });
   } catch (error) {
@@ -53,6 +67,54 @@ export const getSessions = async (req, res) => {
     res.status(200).json({
       success: true,
       data: { sessions },
+      message: '',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      data: null,
+      message: error.message,
+    });
+  }
+};
+
+export const deleteSession = async (req, res) => {
+  try {
+    const session = await Session.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.user._id,
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        message: 'Session not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: null,
+      message: 'Session deleted successfully',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      data: null,
+      message: error.message,
+    });
+  }
+};
+
+export const getPRs = async (req, res) => {
+  try {
+    const sessions = await Session.find({ userId: req.user._id });
+    const prs = getAllTimePRs(sessions);
+
+    res.status(200).json({
+      success: true,
+      data: { prs },
       message: '',
     });
   } catch (error) {
