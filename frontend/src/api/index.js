@@ -23,3 +23,12 @@ export const setGoalWeight = (data) => client.put('/bodyweight/goal', data);
 // Water
 export const logWater = (data) => client.post('/water', data);
 export const getTodayWater = () => client.get('/water/today');
+
+// Goals
+export const getGoalStatus = () => client.get('/goals');
+export const setWeeklyGoal = (data) => client.put('/goals', data);
+
+// PRs
+export const getPRs = () => client.get('/sessions/prs');
+//get sessions on dashboard
+export const getDashboardStats = () => client.get('/sessions/stats');

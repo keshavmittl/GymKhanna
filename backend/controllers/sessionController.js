@@ -2,6 +2,7 @@ import Session from '../models/Session.js';
 import { findPRsForSession ,getAllTimePRs} from '../services/prEngine.js';
 import User from '../models/User.js';
 import { updateStreak } from '../services/streakEngine.js';
+import Exercise from '../models/Exercise.js';
 const calculateTotalVolume = (exercises) => {
   let total = 0;
   for (const exercise of exercises) {
@@ -110,7 +111,11 @@ export const deleteSession = async (req, res) => {
 export const getPRs = async (req, res) => {
   try {
     const sessions = await Session.find({ userId: req.user._id });
-    const prs = getAllTimePRs(sessions);
+    const bodyweightExercises = await Exercise.find({ equipment: 'Bodyweight' }).select('_id');
+    const bodyweightIds = bodyweightExercises.map((ex) => ex._id.toString());
+
+    const allPRs = getAllTimePRs(sessions);
+    const prs = allPRs.filter((pr) => !bodyweightIds.includes(pr.exerciseId.toString()));
 
     res.status(200).json({
       success: true,
@@ -144,6 +149,34 @@ export const getSessionById = async (req, res) => {
     res.status(200).json({
       success: true,
       data: { session },
+      message: '',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      data: null,
+      message: error.message,
+    });
+  }
+};
+
+export const getDashboardStats = async (req, res) => {
+  try {
+    const sessions = await Session.find({ userId: req.user._id }).sort({ date: -1 });
+
+    const totalSessions = sessions.length;
+    const totalVolume = sessions.reduce((sum, s) => sum + s.totalVolume, 0);
+    const totalPRs = sessions.reduce((sum, s) => sum + s.prs.length, 0);
+    const recentSessions = sessions.slice(0, 5);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalSessions,
+        totalVolume,
+        totalPRs,
+        recentSessions,
+      },
       message: '',
     });
   } catch (error) {

@@ -5,8 +5,9 @@ import Login from "./pages/Login";
 import NewSession from "./pages/NewSession";
 import SessionDetail from "./pages/SessionDetail";
 import BodyWeight from "./pages/BodyWeight";
-import Dashboard from './pages/Dashboard';
-
+import Dashboard from "./pages/Dashboard";
+import Progress from "./pages/Progress";
+import Navbar from './components/Navbar';
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
 
@@ -25,32 +26,49 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function AppLayout({ children }) {
+  return (
+    <>
+      <Navbar />
+      <main>{children}</main>
+    </>
+  );
+}
+
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+
       <Route
         path="/"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <AppLayout>
+              <Dashboard />
+            </AppLayout>
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+
       <Route
         path="/new-session"
         element={
           <ProtectedRoute>
-            <NewSession />
+            <AppLayout>
+              <NewSession />
+            </AppLayout>
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/session/:id"
         element={
           <ProtectedRoute>
-            <SessionDetail />
+            <AppLayout>
+              <SessionDetail />
+            </AppLayout>
           </ProtectedRoute>
         }
       />
@@ -59,13 +77,29 @@ function AppRoutes() {
         path="/bodyweight"
         element={
           <ProtectedRoute>
-            <BodyWeight />
+            <AppLayout>
+              <BodyWeight />
+            </AppLayout>
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/progress"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <Progress />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
+
 
 export default function App() {
   return (
