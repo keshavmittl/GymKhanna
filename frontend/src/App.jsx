@@ -8,6 +8,7 @@ import BodyWeight from "./pages/BodyWeight";
 import Dashboard from "./pages/Dashboard";
 import Progress from "./pages/Progress";
 import Navbar from './components/Navbar';
+import ErrorBoundary from './components/ErrorBoundary';
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
 
@@ -100,13 +101,14 @@ function AppRoutes() {
   );
 }
 
-
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

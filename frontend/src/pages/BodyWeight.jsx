@@ -81,7 +81,7 @@ export default function BodyWeight() {
 
         {/* Progress card */}
         <div className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-6 mb-8">
-          <div className="flex justify-between items-end mb-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-4 sm:gap-0 sm:items-end mb-4">
             <div>
               <p className="text-[#666] text-xs uppercase tracking-wide font-semibold mb-1">Current</p>
               <p className="text-3xl font-bold">

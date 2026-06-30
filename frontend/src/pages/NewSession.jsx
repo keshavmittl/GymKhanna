@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { getExercises, createSession } from "../api";
-
+import { getExercises, createSession, createExercise } from "../api";
 export default function NewSession() {
   const [exercises, setExercises] = useState([]);
   const [loadingExercises, setLoadingExercises] = useState(true);
@@ -9,6 +8,13 @@ export default function NewSession() {
   const [selectedExercises, setSelectedExercises] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newExercise, setNewExercise] = useState({
+    name: "",
+    muscleGroup: "Chest",
+    equipment: "Barbell",
+  });
+  const [addingExercise, setAddingExercise] = useState(false);
 
   useEffect(() => {
     const fetchExercises = async () => {
@@ -52,6 +58,23 @@ export default function NewSession() {
     setSelectedExercises(
       selectedExercises.filter((e) => e.exerciseId !== exerciseId),
     );
+  };
+
+  const handleAddExercise = async (e) => {
+    e.preventDefault();
+    if (!newExercise.name.trim()) return;
+
+    setAddingExercise(true);
+    try {
+      const response = await createExercise(newExercise);
+      setExercises([...exercises, response.data.data.exercise]);
+      setNewExercise({ name: "", muscleGroup: "Chest", equipment: "Barbell" });
+      setShowAddForm(false);
+    } catch (error) {
+      alert("Failed to add exercise");
+    } finally {
+      setAddingExercise(false);
+    }
   };
   const updateSet = (exerciseId, setIndex, field, value) => {
     setSelectedExercises(
@@ -175,10 +198,10 @@ export default function NewSession() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="grid grid-cols-[2rem_1fr_1fr_2rem] gap-2 text-xs text-[#666] font-semibold uppercase tracking-wide px-1">
-                    <span>Set</span>
-                    <span>Reps</span>
-                    <span>Weight (kg)</span>
+                  <div className="grid grid-cols-[1.5rem_1fr_1fr_1.5rem] sm:grid-cols-[2rem_1fr_1fr_2rem] gap-2 sm:gap-3 items-center">
+                    <span></span>
+                    <span className="text-center">Reps</span>
+                    <span className="text-center">Weight (kg)</span>
                     <span></span>
                   </div>
 
@@ -236,9 +259,87 @@ export default function NewSession() {
         )}
         {/* Library */}
         <div>
-          <h2 className="text-xs font-bold tracking-[0.2em] uppercase text-[#666] mb-4">
-            Exercise Library
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-bold tracking-[0.2em] uppercase text-[#666]">
+              Exercise Library
+            </h2>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="text-[#e0322f] text-xs font-semibold uppercase tracking-wide hover:text-[#ff4d4a] transition-colors"
+            >
+              {showAddForm ? "Cancel" : "+ Add Exercise"}
+            </button>
+          </div>
+
+          {showAddForm && (
+            <form
+              onSubmit={handleAddExercise}
+              className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-4 mb-6 space-y-3"
+            >
+              <input
+                type="text"
+                placeholder="Exercise name"
+                value={newExercise.name}
+                onChange={(e) =>
+                  setNewExercise({ ...newExercise, name: e.target.value })
+                }
+                required
+                className="w-full bg-[#1c1c1c] rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#e0322f]"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={newExercise.muscleGroup}
+                  onChange={(e) =>
+                    setNewExercise({
+                      ...newExercise,
+                      muscleGroup: e.target.value,
+                    })
+                  }
+                  className="bg-[#1c1c1c] rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#e0322f]"
+                >
+                  {["Chest", "Back", "Legs", "Shoulders", "Arms", "Core"].map(
+                    (group) => (
+                      <option key={group} value={group}>
+                        {group}
+                      </option>
+                    ),
+                  )}
+                </select>
+
+                <select
+                  value={newExercise.equipment}
+                  onChange={(e) =>
+                    setNewExercise({
+                      ...newExercise,
+                      equipment: e.target.value,
+                    })
+                  }
+                  className="bg-[#1c1c1c] rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#e0322f]"
+                >
+                  {[
+                    "Barbell",
+                    "Dumbbell",
+                    "Machine",
+                    "Bodyweight",
+                    "Cable",
+                  ].map((eq) => (
+                    <option key={eq} value={eq}>
+                      {eq}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                disabled={addingExercise}
+                className="w-full bg-[#e0322f] hover:bg-[#c92825] disabled:opacity-50 text-white text-sm font-semibold py-2 rounded-md transition-colors"
+              >
+                {addingExercise ? "Adding…" : "Add to Library"}
+              </button>
+            </form>
+          )}
 
           <div className="space-y-7">
             {Object.entries(groupedExercises).map(([muscleGroup, list]) => (

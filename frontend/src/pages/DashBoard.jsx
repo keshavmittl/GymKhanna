@@ -5,7 +5,6 @@ import { getDashboardStats } from '../api';
 import WaterWidget from '../components/WaterWidget';
 import StreakWidget from '../components/StreakWidget';
 import PRList from '../components/PRList';
-
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
@@ -34,7 +33,7 @@ export default function Dashboard() {
         </h1>
 
         {!loading && stats && (
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             <div className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-4">
               <p className="text-[#666] text-xs uppercase tracking-wide font-semibold mb-1">Sessions</p>
               <p className="text-2xl font-bold">{stats.totalSessions}</p>
