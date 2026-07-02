@@ -2,8 +2,8 @@
 
 A full-stack personal fitness tracker built with the MERN stack. Log workouts, track progressive overload, monitor body weight goals, and stay consistent with a weekly streak system.
 
-**Live Demo:** [gymkhanna.onrender.com](https://gymkhanna.onrender.com) *(link after deployment)*  
-**Backend API:** [gymkhanna-backend.onrender.com](https://gymkhanna-backend.onrender.com)
+**Live Demo:** [gymkhanna.onrender.com](https://gymkhanna-frontend.onrender.com)
+**Backend API:** [gymkhanna-backend.onrender.com](https://gymkhanna.onrender.com/api/health)
 
 ---
 
