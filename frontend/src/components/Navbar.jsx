@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { LogOut } from "lucide-react";
 
@@ -9,42 +9,38 @@ const LINKS = [
   { to: "/progress", label: "Progress" },
 ];
 
-const handleLogout = () => {
-  const confirmed = window.confirm("Are you sure you want to log out?");
-  if (confirmed) {
-    logout();
-  }
-};
 export default function Navbar() {
   const { logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     const confirmed = window.confirm("Are you sure you want to log out?");
     if (confirmed) {
-      logout();
+      await logout();
+      navigate("/login", { replace: true });
     }
   };
 
   return (
- <nav className="bg-[#0a0a0a] border-b border-[#1f1f1f] px-4 py-4">
-  <div className="max-w-6xl mx-auto flex items-center">
-    <div className="flex-1 flex justify-center">
-      <div className="flex gap-2 sm:gap-4 md:gap-6 lg:gap-8 xl:gap-10">
-          {LINKS.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`text-sm font-medium transition-colors ${
-                location.pathname === link.to
-                  ? "text-[#e0322f]"
-                  : "text-[#888] hover:text-white"
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
+    <nav className="bg-[#0a0a0a] border-b border-[#1f1f1f] px-4 py-4">
+      <div className="max-w-6xl mx-auto flex items-center">
+        <div className="flex-1 flex justify-center">
+          <div className="flex gap-2 sm:gap-4 md:gap-6 lg:gap-8 xl:gap-10">
+            {LINKS.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className={`text-sm font-medium transition-colors ${
+                  location.pathname === link.to
+                    ? "text-[#e0322f]"
+                    : "text-[#888] hover:text-white"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
         </div>
         <button
           onClick={handleLogout}

@@ -3,6 +3,8 @@ import client from './client';
 // Auth
 export const signup = (data) => client.post('/auth/signup', data);
 export const login = (data) => client.post('/auth/login', data);
+export const logout = () => client.post('/auth/logout');          // new — revokes session
+export const refreshToken = () => client.post('/auth/refresh');   // new — used by interceptor
 export const getMe = () => client.get('/auth/me');
 
 // Sessions
@@ -30,5 +32,5 @@ export const setWeeklyGoal = (data) => client.put('/goals', data);
 
 // PRs
 export const getPRs = () => client.get('/sessions/prs');
-//get sessions on dashboard
+// Dashboard
 export const getDashboardStats = () => client.get('/sessions/stats');
