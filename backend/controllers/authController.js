@@ -23,7 +23,7 @@ const signAccessToken = (userId) =>
 const refreshCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'Lax',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   maxAge: parseDurationMs(process.env.REFRESH_TOKEN_EXPIRES_IN || '7d'),
   path: '/',           // accessible across all paths
 });
@@ -60,7 +60,7 @@ const clearRefreshCookie = (res) => {
   res.clearCookie('refreshToken', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Lax',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     path: '/',
   });
 };
