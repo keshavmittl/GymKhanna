@@ -3,21 +3,33 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Check, Dumbbell, Plus, X } from 'lucide-react';
 import { getExercises, getLastSets, getSessionById, createSession } from '../api';
 import ExercisePicker from '../components/ExercisePicker';
+import RestTimer from '../components/RestTimer';
+import { useAuth } from '../hooks/useAuth';
 import WorkoutSetEditor from '../components/WorkoutSetEditor';
-import { createDraftExercise, createRepeatDraft, nextSet } from '../workoutDraft';
+import {
+  clearSubmittedWorkoutDraft, copySet, createDraftExercise, createRepeatDraft, nextSet,
+  readWorkoutDraft, storeWorkoutDraft,
+} from '../workoutDraft';
+
+const volumeFormat = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
 
 export default function NewSession() {
   const { state } = useLocation();
+  const { user } = useAuth();
   const repeatId = typeof state?.repeatId === 'string' ? state.repeatId : null;
-  return <WorkoutComposer key={repeatId ?? 'new'} repeatId={repeatId} />;
+  const userId = user?.id ?? user?._id;
+  const draftKey = userId ? `gymkhanna:workout-draft:v1:${userId}:${repeatId ?? 'new'}` : null;
+  return <WorkoutComposer key={draftKey ?? repeatId ?? 'new'} repeatId={repeatId} draftKey={draftKey} />;
 }
 
-function WorkoutComposer({ repeatId }) {
+function WorkoutComposer({ repeatId, draftKey }) {
   const navigate = useNavigate();
   const addButton = useRef(null);
   const saving = useRef(false);
-  const [draft, setDraft] = useState({ name: '', exercises: [] });
-  const [repeatStatus, setRepeatStatus] = useState(repeatId ? 'loading' : 'ready');
+  const mounted = useRef(false);
+  const [restored] = useState(() => readWorkoutDraft(draftKey));
+  const [draft, setDraft] = useState(() => restored ?? { name: '', exercises: [] });
+  const [repeatStatus, setRepeatStatus] = useState(repeatId && !restored ? 'loading' : 'ready');
   const [library, setLibrary] = useState([]);
   const [previous, setPrevious] = useState({});
   const [loading, setLoading] = useState(true);
@@ -28,6 +40,11 @@ function WorkoutComposer({ repeatId }) {
   const [picking, setPicking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -55,7 +72,7 @@ function WorkoutComposer({ repeatId }) {
   }, [attempt]);
 
   useEffect(() => {
-    if (!repeatId) return;
+    if (!repeatId || restored) return;
     let active = true;
     getSessionById(repeatId).then((response) => {
       if (active) {
@@ -66,12 +83,22 @@ function WorkoutComposer({ repeatId }) {
       if (active) setRepeatStatus('error');
     });
     return () => { active = false; };
-  }, [repeatId]);
+  }, [repeatId, restored]);
+
+  useEffect(() => {
+    if (repeatStatus === 'ready') storeWorkoutDraft(draftKey, draft);
+  }, [draft, draftKey, repeatStatus]);
 
   const waitingForSets = historyStatus === 'loading' && !enterManually;
   const selected = new Set(draft.exercises.map((exercise) => exercise.exerciseId));
   const count = draft.exercises.length;
-  const setCount = draft.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
+  const sets = draft.exercises.flatMap((exercise) => exercise.sets);
+  const setCount = sets.length;
+  const volume = sets.reduce((sum, set) => {
+    const weight = Number(set.weight);
+    const reps = Number(set.reps);
+    return set.completed && weight >= 0 && reps >= 0 ? sum + weight * reps : sum;
+  }, 0);
 
   function retry() {
     setLoading(true);
@@ -129,12 +156,15 @@ function WorkoutComposer({ repeatId }) {
     setSubmitting(true);
     try {
       const response = await createSession({ name: draft.name.trim() || 'Workout', exercises });
-      navigate(`/session/${response.data.data.session._id}`, { replace: true, state: { saved: true } });
+      clearSubmittedWorkoutDraft(draftKey, draft);
+      if (mounted.current) {
+        navigate(`/session/${response.data.data.session._id}`, { replace: true, state: { saved: true } });
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not save this workout. Your entries are still here.');
+      if (mounted.current) setError(err.response?.data?.message || 'Could not save this workout. Your entries are still here.');
     } finally {
       saving.current = false;
-      setSubmitting(false);
+      if (mounted.current) setSubmitting(false);
     }
   }
 
@@ -154,8 +184,9 @@ function WorkoutComposer({ repeatId }) {
 
   return (
     <div className="page">
-      <header className="page-head">
-        <div><h1>Log workout</h1><p className="muted">Add a lift and pick up where you left off.</p></div>
+      <header className="page-head workout-heading">
+        <div><h1>Log workout</h1>{restored && <p className="muted small">Draft restored</p>}</div>
+        <RestTimer />
       </header>
 
       <div className="workout-toolbar">
@@ -217,8 +248,8 @@ function WorkoutComposer({ repeatId }) {
                     ...current,
                     sets: current.sets.map((set) => set.id === setId ? { ...set, [field]: value } : set),
                   }))}
-                  onAddSet={() => {
-                    const set = nextSet(exercise.sets, lastSets);
+                  onAddSet={(copyLast) => {
+                    const set = copyLast ? copySet(exercise.sets.at(-1)) : nextSet(exercise.sets, lastSets);
                     updateExercise(id, (current) => ({ ...current, sets: [...current.sets, set] }));
                   }}
                   onRemoveSet={(setId) => updateExercise(id, (current) => ({
@@ -233,9 +264,15 @@ function WorkoutComposer({ repeatId }) {
           </fieldset>
           <footer className="workout-save">
             {error && <p className="notice error" role="alert">{error}</p>}
-            <button className="button primary" type="submit" disabled={submitting || !count}>
-              <Check size={18} aria-hidden="true" /> {submitting ? 'Saving…' : 'Save workout'}
-            </button>
+            <div className="workout-save-row">
+              <div className="workout-volume">
+                <span className="muted small">Completed volume</span>
+                <strong>{volumeFormat.format(volume)} kg</strong>
+              </div>
+              <button className="button primary" type="submit" disabled={submitting || !count}>
+                <Check size={18} aria-hidden="true" /> {submitting ? 'Saving…' : 'Save workout'}
+              </button>
+            </div>
           </footer>
         </form>
       </div>

@@ -19,7 +19,9 @@ A mobile-first training journal built with the MERN stack. Log workouts, review 
 **Previous sets**
 - Selecting a lift starts the first set with the weight and reps from the first completed set the last time you logged it
 - Adding a set uses the matching previous set when available, then copies the last row in the draft
-- Adjust weight in 1 kg steps or enter a fractional weight directly. A new bodyweight exercise starts at 0 kg
+- Drag the weight and rep sliders. The weight range starts near the previous set, and Widen opens a larger range. Tap either number to enter an exact value. A new bodyweight exercise starts at 0 kg
+- Copy the last set in a lift, see completed volume update as you log, and use the rest timer between sets
+- Unsaved workouts stay in the same browser tab as account-specific drafts and are cleared after a successful save
 
 **Body Weight Tracking**
 - Daily weight logging with a goal weight
