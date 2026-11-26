@@ -10,6 +10,7 @@ import progressRoutes from './routes/progress.js';
 import bodyWeightRoutes from './routes/bodyweight.js';
 import waterRoutes from './routes/water.js';
 import goalRoutes from './routes/goals.js';
+import { startSessionCache } from './services/sessionCache.js';
 
 dotenv.config();
 
@@ -79,6 +80,7 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('MongoDB connected successfully');
+    startSessionCache(process.env.REDIS_URL);
     app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
   })
   .catch((err) => {

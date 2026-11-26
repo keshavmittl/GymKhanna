@@ -1,386 +1,243 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { getExercises, createSession, createExercise } from "../api";
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Check, Dumbbell, Plus, X } from 'lucide-react';
+import { getExercises, getLastSets, getSessionById, createSession } from '../api';
+import ExercisePicker from '../components/ExercisePicker';
+import WorkoutSetEditor from '../components/WorkoutSetEditor';
+import { createDraftExercise, createRepeatDraft, nextSet } from '../workoutDraft';
+
 export default function NewSession() {
-  const [exercises, setExercises] = useState([]);
-  const [loadingExercises, setLoadingExercises] = useState(true);
-  const [sessionName, setSessionName] = useState("");
-  const [selectedExercises, setSelectedExercises] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
+  const { state } = useLocation();
+  const repeatId = typeof state?.repeatId === 'string' ? state.repeatId : null;
+  return <WorkoutComposer key={repeatId ?? 'new'} repeatId={repeatId} />;
+}
+
+function WorkoutComposer({ repeatId }) {
   const navigate = useNavigate();
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newExercise, setNewExercise] = useState({
-    name: "",
-    muscleGroup: "Chest",
-    equipment: "Barbell",
-  });
-  const [addingExercise, setAddingExercise] = useState(false);
+  const addButton = useRef(null);
+  const saving = useRef(false);
+  const [draft, setDraft] = useState({ name: '', exercises: [] });
+  const [repeatStatus, setRepeatStatus] = useState(repeatId ? 'loading' : 'ready');
+  const [library, setLibrary] = useState([]);
+  const [previous, setPrevious] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [libraryProblem, setLibraryProblem] = useState(false);
+  const [historyStatus, setHistoryStatus] = useState('loading');
+  const [enterManually, setEnterManually] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [picking, setPicking] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchExercises = async () => {
-      try {
-        const response = await getExercises();
-        setExercises(response.data.data.exercises);
-      } catch (error) {
-        console.error("Failed to load exercises:", error);
-      } finally {
-        setLoadingExercises(false);
+    let active = true;
+    getExercises().then((response) => {
+      if (active) {
+        setLibrary(response.data.data.exercises);
+        setLibraryProblem(false);
       }
-    };
-    fetchExercises();
-  }, []);
+    }).catch(() => {
+      if (active) setLibraryProblem(true);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
 
-  const groupedExercises = useMemo(() => {
-    const groups = {};
-    for (const ex of exercises) {
-      if (!groups[ex.muscleGroup]) groups[ex.muscleGroup] = [];
-      groups[ex.muscleGroup].push(ex);
+    getLastSets().then((response) => {
+      if (active) {
+        setPrevious(response.data.data.lastSets);
+        setHistoryStatus('ready');
+      }
+    }).catch(() => {
+      if (active) setHistoryStatus('error');
+    });
+
+    return () => { active = false; };
+  }, [attempt]);
+
+  useEffect(() => {
+    if (!repeatId) return;
+    let active = true;
+    getSessionById(repeatId).then((response) => {
+      if (active) {
+        setDraft(createRepeatDraft(response.data.data.session));
+        setRepeatStatus('ready');
+      }
+    }).catch(() => {
+      if (active) setRepeatStatus('error');
+    });
+    return () => { active = false; };
+  }, [repeatId]);
+
+  const waitingForSets = historyStatus === 'loading' && !enterManually;
+  const selected = new Set(draft.exercises.map((exercise) => exercise.exerciseId));
+  const count = draft.exercises.length;
+  const setCount = draft.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
+
+  function retry() {
+    setLoading(true);
+    setHistoryStatus('loading');
+    setAttempt((value) => value + 1);
+  }
+
+  function closePicker() {
+    setPicking(false);
+    addButton.current?.focus();
+  }
+
+  function addExercise(exercise) {
+    const newExercise = createDraftExercise(exercise, previous[exercise._id]);
+    if (exercise.equipment === 'Bodyweight' && newExercise.sets[0].weight === '') {
+      newExercise.sets[0].weight = 0;
     }
-    return groups;
-  }, [exercises]);
+    setDraft((current) => ({ ...current, exercises: [...current.exercises, newExercise] }));
+    setError('');
+    closePicker();
+  }
 
-  const addExercise = (exercise) => {
-    const alreadyAdded = selectedExercises.some(
-      (e) => e.exerciseId === exercise._id,
-    );
-    if (alreadyAdded) return;
-    setSelectedExercises([
-      ...selectedExercises,
-      {
-        exerciseId: exercise._id,
-        name: exercise.name,
-        sets: [{ reps: "", weight: "", completed: true }],
-      },
-    ]);
-  };
+  function updateExercise(exerciseId, update) {
+    setDraft((current) => ({
+      ...current,
+      exercises: current.exercises.map((exercise) =>
+        exercise.exerciseId === exerciseId ? update(exercise) : exercise),
+    }));
+  }
 
-  const removeExercise = (exerciseId) => {
-    setSelectedExercises(
-      selectedExercises.filter((e) => e.exerciseId !== exerciseId),
-    );
-  };
-
-  const handleAddExercise = async (e) => {
-    e.preventDefault();
-    if (!newExercise.name.trim()) return;
-
-    setAddingExercise(true);
-    try {
-      const response = await createExercise(newExercise);
-      setExercises([...exercises, response.data.data.exercise]);
-      setNewExercise({ name: "", muscleGroup: "Chest", equipment: "Barbell" });
-      setShowAddForm(false);
-    } catch (error) {
-      alert("Failed to add exercise");
-    } finally {
-      setAddingExercise(false);
-    }
-  };
-  const updateSet = (exerciseId, setIndex, field, value) => {
-    setSelectedExercises(
-      selectedExercises.map((ex) => {
-        if (ex.exerciseId !== exerciseId) return ex;
-
-        const updatedSets = ex.sets.map((set, idx) =>
-          idx === setIndex ? { ...set, [field]: value } : set,
-        );
-
-        return { ...ex, sets: updatedSets };
-      }),
-    );
-  };
-
-  const addSet = (exerciseId) => {
-    setSelectedExercises(
-      selectedExercises.map((ex) => {
-        if (ex.exerciseId !== exerciseId) return ex;
-        return {
-          ...ex,
-          sets: [...ex.sets, { reps: "", weight: "", completed: true }],
-        };
-      }),
-    );
-  };
-
-  const removeSet = (exerciseId, setIndex) => {
-    setSelectedExercises(
-      selectedExercises.map((ex) => {
-        if (ex.exerciseId !== exerciseId) return ex;
-        return { ...ex, sets: ex.sets.filter((_, idx) => idx !== setIndex) };
-      }),
-    );
-  };
-
-  const handleSubmit = async () => {
-    if (!sessionName.trim()) {
-      alert("Please name your session");
-      return;
-    }
-    if (selectedExercises.length === 0) {
-      alert("Add at least one exercise");
+  async function save(event) {
+    event.preventDefault();
+    if (saving.current) return;
+    if (!count) {
+      setError('Add an exercise before saving your workout.');
       return;
     }
 
-    const cleanedExercises = selectedExercises.map((ex) => ({
-      exerciseId: ex.exerciseId,
-      name: ex.name,
-      sets: ex.sets.map((set) => ({
-        reps: Number(set.reps) || 0,
-        weight: Number(set.weight) || 0,
-        completed: set.completed,
-      })),
+    const invalid = draft.exercises.find(({ sets }) => sets.some(({ reps, weight, completed }) =>
+      reps === '' || !Number.isInteger(Number(reps)) || Number(reps) < (completed ? 1 : 0) ||
+      weight === '' || !Number.isFinite(Number(weight)) || Number(weight) < 0,
+    ));
+    if (invalid) {
+      setError(`Check the weight and reps for ${invalid.name}. A completed set needs at least one rep.`);
+      return;
+    }
+
+    const exercises = draft.exercises.map(({ exerciseId, name, sets }) => ({
+      exerciseId, name,
+      sets: sets.map(({ weight, reps, completed }) => ({ weight: Number(weight), reps: Number(reps), completed })),
     }));
 
+    setError('');
+    saving.current = true;
     setSubmitting(true);
     try {
-      const response = await createSession({
-        name: sessionName,
-        exercises: cleanedExercises,
-      });
-      const sessionId = response.data.data.session._id;
-      navigate(`/session/${sessionId}`);
-    } catch (error) {
-      console.error("Failed to save session:", error);
-      alert("Failed to save session. Please try again.");
+      const response = await createSession({ name: draft.name.trim() || 'Workout', exercises });
+      navigate(`/session/${response.data.data.session._id}`, { replace: true, state: { saved: true } });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not save this workout. Your entries are still here.');
     } finally {
+      saving.current = false;
       setSubmitting(false);
     }
-  };
-  const isSelected = (id) => selectedExercises.some((e) => e.exerciseId === id);
+  }
 
-  if (loadingExercises) {
+  if (repeatStatus !== 'ready') {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] text-gray-500 flex items-center justify-center font-sans">
-        Loading exercises…
+      <div className="page">
+        <header className="page-head"><h1>Log workout</h1></header>
+        {repeatStatus === 'loading' ? <p className="muted" role="status">Opening your workout…</p> : (
+          <div className="notice error with-action">
+            <p role="alert">Could not open that workout.</p>
+            <Link to="/new-session" replace className="text-button">Start a blank workout</Link>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#f5f5f5] font-sans">
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        {/* Header */}
-        <div className="mb-8">
-          <p className="text-[#e0322f] text-xs font-bold tracking-[0.2em] uppercase mb-2">
-            New Session
-          </p>
-          <input
-            type="text"
-            placeholder="Name this session — Push Day, Leg Day…"
-            value={sessionName}
-            onChange={(e) => setSessionName(e.target.value)}
-            className="w-full bg-transparent text-3xl font-bold placeholder-[#3a3a3a] outline-none border-b-2 border-[#1f1f1f] focus:border-[#e0322f] pb-3 transition-colors"
-          />
-        </div>
+    <div className="page">
+      <header className="page-head">
+        <div><h1>Log workout</h1><p className="muted">Add a lift and pick up where you left off.</p></div>
+      </header>
 
-        {/* Selected exercises */}
-        {selectedExercises.length === 0 ? (
-          <div className="border border-dashed border-[#262626] rounded-xl py-10 text-center">
-            <p className="text-[#555] text-sm">
-              Nothing added yet — pick exercises from the library below.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {selectedExercises.map((ex) => (
-              <div
-                key={ex.exerciseId}
-                className="bg-[#141414] border border-[#1f1f1f] rounded-xl px-4 py-4"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-medium">{ex.name}</span>
-                  <button
-                    onClick={() => removeExercise(ex.exerciseId)}
-                    className="text-[#555] hover:text-[#e0322f] text-xs font-semibold uppercase tracking-wide transition-colors"
-                  >
-                    Remove
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="grid grid-cols-[1.5rem_1fr_1fr_1.5rem] sm:grid-cols-[2rem_1fr_1fr_2rem] gap-2 sm:gap-3 items-center">
-                    <span></span>
-                    <span className="text-center">Reps</span>
-                    <span className="text-center">Weight (kg)</span>
-                    <span></span>
-                  </div>
-
-                  {ex.sets.map((set, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-[2rem_1fr_1fr_2rem] gap-2 items-center"
-                    >
-                      <span className="text-sm text-[#888] font-medium">
-                        {idx + 1}
-                      </span>
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={set.reps}
-                        onChange={(e) =>
-                          updateSet(ex.exerciseId, idx, "reps", e.target.value)
-                        }
-                        className="bg-[#1c1c1c] rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#e0322f] w-full"
-                      />
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={set.weight}
-                        onChange={(e) =>
-                          updateSet(
-                            ex.exerciseId,
-                            idx,
-                            "weight",
-                            e.target.value,
-                          )
-                        }
-                        className="bg-[#1c1c1c] rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#e0322f] w-full"
-                      />
-                      <button
-                        onClick={() => removeSet(ex.exerciseId, idx)}
-                        disabled={ex.sets.length === 1}
-                        className="text-[#555] hover:text-[#e0322f] disabled:opacity-20 disabled:hover:text-[#555] text-sm"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => addSet(ex.exerciseId)}
-                  className="mt-3 text-xs font-semibold text-[#e0322f] hover:text-[#ff4d4a] uppercase tracking-wide transition-colors"
-                >
-                  + Add Set
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        {/* Library */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-bold tracking-[0.2em] uppercase text-[#666]">
-              Exercise Library
-            </h2>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="text-[#e0322f] text-xs font-semibold uppercase tracking-wide hover:text-[#ff4d4a] transition-colors"
-            >
-              {showAddForm ? "Cancel" : "+ Add Exercise"}
-            </button>
-          </div>
-
-          {showAddForm && (
-            <form
-              onSubmit={handleAddExercise}
-              className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-4 mb-6 space-y-3"
-            >
-              <input
-                type="text"
-                placeholder="Exercise name"
-                value={newExercise.name}
-                onChange={(e) =>
-                  setNewExercise({ ...newExercise, name: e.target.value })
-                }
-                required
-                className="w-full bg-[#1c1c1c] rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#e0322f]"
-              />
-
-              <div className="grid grid-cols-2 gap-3">
-                <select
-                  value={newExercise.muscleGroup}
-                  onChange={(e) =>
-                    setNewExercise({
-                      ...newExercise,
-                      muscleGroup: e.target.value,
-                    })
-                  }
-                  className="bg-[#1c1c1c] rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#e0322f]"
-                >
-                  {["Chest", "Back", "Legs", "Shoulders", "Arms", "Core"].map(
-                    (group) => (
-                      <option key={group} value={group}>
-                        {group}
-                      </option>
-                    ),
-                  )}
-                </select>
-
-                <select
-                  value={newExercise.equipment}
-                  onChange={(e) =>
-                    setNewExercise({
-                      ...newExercise,
-                      equipment: e.target.value,
-                    })
-                  }
-                  className="bg-[#1c1c1c] rounded-md px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#e0322f]"
-                >
-                  {[
-                    "Barbell",
-                    "Dumbbell",
-                    "Machine",
-                    "Bodyweight",
-                    "Cable",
-                  ].map((eq) => (
-                    <option key={eq} value={eq}>
-                      {eq}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                disabled={addingExercise}
-                className="w-full bg-[#e0322f] hover:bg-[#c92825] disabled:opacity-50 text-white text-sm font-semibold py-2 rounded-md transition-colors"
-              >
-                {addingExercise ? "Adding…" : "Add to Library"}
-              </button>
-            </form>
-          )}
-
-          <div className="space-y-7">
-            {Object.entries(groupedExercises).map(([muscleGroup, list]) => (
-              <div key={muscleGroup}>
-                <h3 className="text-sm font-bold text-[#888] mb-2.5 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#e0322f]" />
-                  {muscleGroup}
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {list.map((exercise) => {
-                    const selected = isSelected(exercise._id);
-                    return (
-                      <button
-                        key={exercise._id}
-                        onClick={() => addExercise(exercise)}
-                        disabled={selected}
-                        className={`text-left text-sm rounded-lg px-3.5 py-2.5 transition-colors border ${
-                          selected
-                            ? "bg-[#1a1010] border-[#3a1a1a] text-[#e0322f]/60 cursor-default"
-                            : "bg-[#121212] border-[#1f1f1f] hover:border-[#e0322f]/40 hover:bg-[#161111] text-[#ddd]"
-                        }`}
-                      >
-                        {exercise.name}
-                        {selected && (
-                          <span className="ml-2 text-xs">✓ added</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="workout-toolbar">
         <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="fixed bottom-6 right-6 bg-[#e0322f] hover:bg-[#c92825] disabled:opacity-50 text-white font-bold px-6 py-3.5 rounded-full shadow-lg shadow-[#e0322f]/20 transition-colors"
+          className="button primary" type="button" ref={addButton}
+          disabled={loading || libraryProblem || submitting}
+          aria-expanded={picking} aria-controls={picking ? 'exercise-picker' : undefined}
+          onClick={() => setPicking(!picking)}
         >
-          {submitting ? "Saving…" : "Save Session"}
+          {picking ? <X size={18} aria-hidden="true" /> : <Plus size={18} aria-hidden="true" />}
+          {picking ? 'Close library' : 'Add exercise'}
         </button>
+        <span className="muted small" aria-live="polite">
+          {loading ? 'Loading exercise library…' : `${count} exercise${count === 1 ? '' : 's'} · ${setCount} set${setCount === 1 ? '' : 's'}`}
+        </span>
+      </div>
+
+      {(libraryProblem || historyStatus === 'error') && (
+        <div className="notice with-action">
+          <span role="status">{libraryProblem ? 'Could not load the exercise library.' : 'Previous sets are unavailable. You can enter values manually.'}</span>
+          <button className="text-button" type="button" disabled={loading} onClick={retry}>Retry</button>
+        </div>
+      )}
+      {!loading && !libraryProblem && waitingForSets && (
+        <div className="notice with-action">
+          <span role="status">Loading previous sets…</span>
+          <button className="text-button" type="button" onClick={() => setEnterManually(true)}>Enter sets manually</button>
+        </div>
+      )}
+
+      <div className={picking ? 'composer picker-open' : 'composer'}>
+        {picking && (
+          <aside className="composer-picker">
+            <ExercisePicker exercises={library} selected={selected} waitingForSets={waitingForSets} onSelect={addExercise} onCreate={(exercise) => {
+              setLibrary((current) => [...current, exercise]);
+              addExercise(exercise);
+            }} />
+          </aside>
+        )}
+        <form className="composer-main" onSubmit={save} noValidate>
+          <fieldset className="stack" disabled={submitting}>
+            <label className="field workout-name">
+              Workout name <span className="muted small">(optional)</span>
+              <input value={draft.name} maxLength={100} placeholder="e.g. Upper body" onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+            </label>
+            {count === 0 && (
+              <div className="panel empty composer-empty">
+                <Dumbbell size={25} aria-hidden="true" />
+                <h2>No exercises yet</h2>
+                <p className="muted">Pick an exercise to start logging your sets.</p>
+              </div>
+            )}
+            {draft.exercises.map((exercise) => {
+              const id = exercise.exerciseId;
+              const lastSets = previous[id] ?? [];
+              return (
+                <WorkoutSetEditor key={id} exercise={exercise} previous={lastSets}
+                  update={(setId, field, value) => updateExercise(id, (current) => ({
+                    ...current,
+                    sets: current.sets.map((set) => set.id === setId ? { ...set, [field]: value } : set),
+                  }))}
+                  onAddSet={() => {
+                    const set = nextSet(exercise.sets, lastSets);
+                    updateExercise(id, (current) => ({ ...current, sets: [...current.sets, set] }));
+                  }}
+                  onRemoveSet={(setId) => updateExercise(id, (current) => ({
+                    ...current, sets: current.sets.filter((set) => set.id !== setId),
+                  }))}
+                  onRemove={() => setDraft((current) => ({
+                    ...current, exercises: current.exercises.filter((item) => item.exerciseId !== id),
+                  }))}
+                />
+              );
+            })}
+          </fieldset>
+          <footer className="workout-save">
+            {error && <p className="notice error" role="alert">{error}</p>}
+            <button className="button primary" type="submit" disabled={submitting || !count}>
+              <Check size={18} aria-hidden="true" /> {submitting ? 'Saving…' : 'Save workout'}
+            </button>
+          </footer>
+        </form>
       </div>
     </div>
   );

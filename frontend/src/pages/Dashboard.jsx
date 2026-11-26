@@ -1,88 +1,88 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { ArrowRight, Dumbbell, Plus, Repeat2, Trophy, Weight } from 'lucide-react';
 import { getDashboardStats } from '../api';
 import WaterWidget from '../components/WaterWidget';
 import StreakWidget from '../components/StreakWidget';
 import PRList from '../components/PRList';
+import SessionList from '../components/SessionList';
+
+const number = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 1 });
+const today = new Intl.DateTimeFormat('en-IN', { weekday: 'long', month: 'long', day: 'numeric' });
+
 export default function Dashboard() {
-  const { user } = useAuth();
   const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await getDashboardStats();
-        setStats(response.data.data);
-      } catch (error) {
-        console.error('Failed to load dashboard stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
-  }, []);
+    let active = true;
+    getDashboardStats().then((response) => {
+      if (active) setStats(response.data.data);
+    }).catch(() => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, [attempt]);
+
+  const metrics = [
+    { label: 'Workouts logged', value: stats?.totalSessions, icon: Dumbbell },
+    { label: 'Total volume', value: stats && `${number.format(stats.totalVolume)} kg`, icon: Weight },
+    { label: 'PRs hit', value: stats?.totalPRs, icon: Trophy },
+  ];
+  const latest = stats?.recentSessions[0];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#f5f5f5] font-sans">
-      <div className="max-w-2xl mx-auto px-6 py-10">
-        <p className="text-[#e0322f] text-xs font-bold tracking-[0.2em] uppercase mb-1">Dashboard</p>
-        <h1 className="text-3xl font-bold mb-8">
-          {user ? `Welcome back, ${user.name}` : 'Welcome back'}
-        </h1>
+    <div className="page">
+      <header className="page-head journal-head">
+        <div>
+          <p className="eyebrow">{today.format(new Date())}</p>
+          <h1>Training journal</h1>
+        </div>
+        <div className="actions">
+          {latest && <Link className="button" to="/new-session" state={{ repeatId: latest._id }}><Repeat2 size={18} aria-hidden="true" /> Repeat last</Link>}
+          <Link to="/new-session" className="button primary"><Plus size={19} aria-hidden="true" /> Log workout</Link>
+        </div>
+      </header>
 
-        {!loading && stats && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-            <div className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-4">
-              <p className="text-[#666] text-xs uppercase tracking-wide font-semibold mb-1">Sessions</p>
-              <p className="text-2xl font-bold">{stats.totalSessions}</p>
+      <div className="dashboard-top">
+        <StreakWidget />
+        <section aria-label="Training totals" className="metric-grid">
+          {metrics.map(({ label, value, icon: Icon }) => (
+            <div className="metric" key={label}>
+              <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+              <p className="muted small">{label}</p>
+              <strong>{value ?? '—'}</strong>
             </div>
-            <div className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-4">
-              <p className="text-[#666] text-xs uppercase tracking-wide font-semibold mb-1">Volume</p>
-              <p className="text-2xl font-bold">{(stats.totalVolume / 1000).toFixed(1)}t</p>
-            </div>
-            <div className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-4">
-              <p className="text-[#666] text-xs uppercase tracking-wide font-semibold mb-1">PRs Hit</p>
-              <p className="text-2xl font-bold text-[#e0322f]">{stats.totalPRs}</p>
-            </div>
+          ))}
+        </section>
+      </div>
+
+      {failed && (
+        <div className="notice error with-action" role="status">
+          <span>Could not load your workout summary.</span>
+          <button className="text-button" onClick={() => { setFailed(false); setAttempt((value) => value + 1); }}>Retry</button>
+        </div>
+      )}
+
+      <div className="dashboard-body">
+        <section className="panel recent-workouts">
+          <div className="section-head">
+            <h2>Recent workouts</h2>
+            <Link className="text-button" to="/history">View history <ArrowRight size={16} aria-hidden="true" /></Link>
           </div>
-        )}
-
-        <div className="space-y-5 mb-8">
-          <StreakWidget />
+          {latest ? <SessionList sessions={stats.recentSessions} />
+            : failed ? <p className="empty muted">Recent workouts are unavailable.</p>
+            : !stats ? <p className="empty muted" role="status">Loading workouts…</p>
+            : (
+              <div className="empty">
+                <p className="muted">You haven’t logged a workout yet.</p>
+                <Link className="text-button" to="/new-session">Log your first workout <ArrowRight size={16} aria-hidden="true" /></Link>
+              </div>
+            )}
+        </section>
+        <div className="stack">
           <WaterWidget />
           <PRList />
         </div>
-
-        <h2 className="text-xs font-bold tracking-[0.2em] uppercase text-[#666] mb-3">Recent Sessions</h2>
-        {!loading && stats && stats.recentSessions.length === 0 && (
-          <p className="text-[#555] text-sm">No sessions yet — log your first workout.</p>
-        )}
-        {!loading && stats && stats.recentSessions.length > 0 && (
-          <div className="space-y-2">
-            {stats.recentSessions.map((session) => (
-              <Link
-                key={session._id}
-                to={`/session/${session._id}`}
-                className="flex justify-between items-center bg-[#141414] border border-[#1f1f1f] hover:border-[#2a2a2a] rounded-xl px-4 py-3 transition-colors"
-              >
-                <div>
-                  <p className="font-medium">{session.name}</p>
-                  <p className="text-[#666] text-xs">
-                    {new Date(session.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-sm">{session.totalVolume.toLocaleString()} kg</p>
-                  {session.prs.length > 0 && (
-                    <p className="text-[#e0322f] text-xs">{session.prs.length} PR{session.prs.length > 1 ? 's' : ''}</p>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

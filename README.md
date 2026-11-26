@@ -1,9 +1,9 @@
 # GymKhanna 💪
 
-A full-stack personal fitness tracker built with the MERN stack. Log workouts, track progressive overload, monitor body weight goals, and stay consistent with a weekly streak system.
+A mobile-first training journal built with the MERN stack. Log workouts, review personal records, and track body weight, water intake, and weekly goals.
 
-**Live Demo:** [gymkhanna.onrender.com](https://gymkhanna-frontend.onrender.com)
-**Backend API:** [gymkhanna-backend.onrender.com](https://gymkhanna.onrender.com/api/health)
+**Existing deployment:** [gymkhanna.onrender.com](https://gymkhanna-frontend.onrender.com)
+**Existing backend API:** [gymkhanna-backend.onrender.com](https://gymkhanna.onrender.com/api/health)
 
 ---
 
@@ -13,12 +13,13 @@ A full-stack personal fitness tracker built with the MERN stack. Log workouts, t
 - Create workout sessions with exercises, sets, reps, and weight
 - Auto-calculates total session volume (sets × reps × weight)
 - PR (Personal Record) detection — automatically flags when you lift a new heaviest weight for any exercise
-- Session history with per-session volume and PR badges
+- Search workout history by workout or exercise name
+- Repeat a past workout as an editable draft, or repeat the latest workout from the journal
 
-**Progressive Overload Engine**
-- After each session, calculates the recommended weight for your next session
-- Logic: completed all reps → +2.5kg, partial completion → same weight, failed sets → deload (×0.9)
-- Pure function architecture — independently testable, no DB calls inside
+**Previous sets**
+- Selecting a lift starts the first set with the weight and reps from the first completed set the last time you logged it
+- Adding a set uses the matching previous set when available, then copies the last row in the draft
+- Adjust weight in 1 kg steps or enter a fractional weight directly. A new bodyweight exercise starts at 0 kg
 
 **Body Weight Tracking**
 - Daily weight logging with a goal weight
@@ -44,7 +45,7 @@ A full-stack personal fitness tracker built with the MERN stack. Log workouts, t
 **Auth & Security**
 - JWT authentication with bcrypt password hashing
 - Protected routes (frontend + backend)
-- Auto-logout on token expiry via axios response interceptor
+- Short-lived JWT access tokens and rotating refresh tokens in an HttpOnly cookie
 - Error boundary for graceful crash handling
 
 ---
@@ -55,9 +56,10 @@ A full-stack personal fitness tracker built with the MERN stack. Log workouts, t
 |-------|-----------|
 | Frontend | React 19, Vite, Tailwind CSS v4 |
 | Charts | Recharts |
-| Routing | React Router v6 |
+| Routing | React Router |
 | Backend | Node.js, Express |
 | Database | MongoDB, Mongoose |
+| Cache | Redis (optional) |
 | Auth | JWT, bcrypt |
 | Deployment | Render (backend + frontend), MongoDB Atlas |
 
@@ -66,38 +68,41 @@ A full-stack personal fitness tracker built with the MERN stack. Log workouts, t
 ## Architecture Highlights
 
 **Backend**
-- RESTful API with consistent `{ success, data, message }` response shape
-- Separation of concerns: pure service functions (`overloadEngine.js`, `prEngine.js`, `streakEngine.js`) contain all business logic — controllers handle only HTTP and DB orchestration
-- Route ordering enforced carefully to prevent wildcard `/:id` from swallowing specific endpoints like `/prs` and `/stats`
-- Axios response interceptor auto-logs out users on 401 (expired token)
+- Express routes use JWT middleware and a consistent `{ success, data, message }` response shape.
+- The previous-sets endpoint filters to the authenticated user in MongoDB and returns the latest completed sets for each exercise.
+
+**Redis cache**
+- Authenticated reads of `/api/sessions/stats` and `/api/sessions/prs` check a per-user cache before querying MongoDB.
+- Cached values expire after 60 seconds. Creating or deleting a workout removes that user's cache version, so any read already in progress can only fill the old version.
+- Without `REDIS_URL`, or if a Redis operation fails, the API continues using MongoDB. If Redis cannot receive an invalidation during an outage, a previously cached response can be stale until its TTL expires.
 
 **Frontend**
-- Context API for global auth and theme state
-- Single axios instance with request interceptor auto-attaching JWT
-- `Promise.all` for parallel independent data fetches
-- Immutable state updates throughout (spread patterns, `.filter()`, `.map()` — no direct mutation)
+- React Context and an Axios interceptor handle sign-in and token refresh. React Router protects the journal screens.
 
 ---
 
 ## Local Setup
 
 ### Prerequisites
-- Node.js 18+
-- MongoDB Atlas account (free tier)
+- Node.js 22 (tested with 22.22.3)
+- A MongoDB connection (local or Atlas)
+- A running Redis instance if you want to exercise caching
 
 ### Backend
 
 ```bash
 cd backend
-npm install
+npm ci
 ```
 
 Create `backend/.env`:
 ```
 PORT=5001
-MONGODB_URI=your_mongodb_atlas_connection_string
-JWT_SECRET=your_jwt_secret_here
+MONGODB_URI=your_mongodb_connection_string
+ACCESS_TOKEN_SECRET=your_long_random_secret_here
 CLIENT_URL=http://localhost:5173
+# Optional
+# REDIS_URL=redis://127.0.0.1:6379
 ```
 
 ```bash
@@ -109,7 +114,7 @@ npm run dev       # starts on port 5001
 
 ```bash
 cd frontend
-npm install
+npm ci
 ```
 
 Create `frontend/.env`:
@@ -120,6 +125,9 @@ VITE_API_URL=http://localhost:5001/api
 ```bash
 npm run dev       # starts on port 5173
 ```
+
+To run the existing and new test suites, use `npm --prefix backend test -- --runInBand`
+and `npm --prefix frontend test` from the repository root.
 
 ### Test the backend is running
 ```
@@ -142,6 +150,7 @@ GET http://localhost:5001/api/health
 | DELETE | `/api/sessions/:id` | Delete session |
 | GET | `/api/sessions/prs` | All-time personal records |
 | GET | `/api/sessions/stats` | Dashboard stats (totals + recent sessions) |
+| GET | `/api/sessions/last-sets` | Latest completed sets by exercise for the signed-in user |
 | POST | `/api/exercises` | Add custom exercise |
 | GET | `/api/exercises` | Get exercise library (defaults + user's custom) |
 | POST | `/api/bodyweight` | Log weight entry |
@@ -162,11 +171,9 @@ It's a profile setting that gets overwritten in place — not a historical log. 
 **Why store totalVolume instead of calculating on read?**  
 Dashboard and progress pages need to aggregate volume across potentially hundreds of sessions. Pre-computing at write time keeps reads cheap regardless of how much historical data accumulates.
 
-**Why pure functions for overload/PR/streak logic?**  
-Testable in isolation without mocking a database. The controller's job is data orchestration; the service function's job is the actual logic. Separating them keeps both simple.
+**Why pure functions for PR and streak logic?**
 
-**Why a response interceptor for 401 handling?**  
-Centralizes expired-token handling in one place instead of each page needing its own 401 check. The interceptor uses `window.location.href` instead of React Router's `navigate()` because `client.js` lives outside React's component tree.
+Testable in isolation without mocking a database. The controller's job is data orchestration; the service function's job is the actual logic. Separating them keeps both simple.
 
 ---
 
@@ -178,8 +185,8 @@ gymkhanna/
 │   ├── controllers/     # HTTP handlers (thin layer, calls services)
 │   ├── models/          # Mongoose schemas
 │   ├── routes/          # Express route definitions
-│   ├── services/        # Pure business logic
-│   │   ├── overloadEngine.js
+│   ├── services/        # Workout rules and Redis caching
+│   │   ├── sessionCache.js
 │   │   ├── prEngine.js
 │   │   └── streakEngine.js
 │   ├── middleware/      # JWT auth middleware

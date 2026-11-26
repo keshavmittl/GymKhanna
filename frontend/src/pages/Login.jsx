@@ -1,172 +1,85 @@
-import { useState } from "react";
-import { useNavigate, Link, Navigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
+import { useState } from 'react';
+import { ArrowRight, Dumbbell, Eye, EyeOff } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
   const { login, signup, isAuthenticated, loading } = useAuth();
-  const navigate = useNavigate();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-gray-700 border-t-red-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <p className="screen-status" role="status">Opening GymKhanna…</p>;
+  if (isAuthenticated) return <Navigate to="/" replace />;
 
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
+  async function submit(event) {
+    event.preventDefault();
+    setError('');
+    const fields = new FormData(event.currentTarget);
+    const email = fields.get('email');
+    const password = fields.get('password');
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-
-    if (isSignup && formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+    if (isSignup && password !== fields.get('confirmPassword')) {
+      setError('Passwords do not match.');
       return;
     }
 
     setSubmitting(true);
-
     try {
-      if (isSignup) {
-        await signup({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        });
-      } else {
-        await login({ email: formData.email, password: formData.password });
-      }
-      navigate("/");
+      if (isSignup) await signup({ name: fields.get('name').trim(), email, password });
+      else await login({ email, password });
     } catch (err) {
-      const message = err.response?.data?.message || "Something went wrong";
-      setError(message);
+      setError(err.response?.data?.message || 'Could not continue. Try again.');
     } finally {
       setSubmitting(false);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      <div className="bg-[#141414] rounded-xl p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-white mb-1">
-          {isSignup ? (
-            "Create your account"
-          ) : (
-            <>
-              <span className="block">🏋️ GymKhanna</span>
-              <span className="block text-gray-400 text-base mt-1">
-                Track Progress. Build Consistency.
-              </span>
-            </>
-          )}
-        </h1>
-        <p className="text-gray-500 text-sm mb-6">
-          {isSignup ? "Start tracking your lifts" : "Log in to GymKhanna"}
-        </p>
-
-        {error && (
-          <div className="bg-red-500/10 text-red-500 text-sm rounded-lg px-4 py-3 mb-4">
-            {error}
+    <main className="auth-page">
+      <div className="auth-photo" aria-hidden="true" />
+      <div className="auth-main">
+        <div className="auth-inner">
+          <div className="brand auth-brand">
+            <span className="brand-mark"><Dumbbell size={20} aria-hidden="true" /></span>GymKhanna
           </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isSignup && (
-            <input
-              type="text"
-              name="name"
-              placeholder="Name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              className="w-full bg-[#1c1c1c] text-white rounded-md px-4 py-2.5 outline-none focus:ring-2 focus:ring-red-500"
-            />
-          )}
-
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className="w-full bg-[#1c1c1c] text-white rounded-md px-4 py-2.5 outline-none focus:ring-2 focus:ring-red-500"
-          />
-
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              className="w-full bg-[#1c1c1c] text-white rounded-md px-4 py-2.5 pr-12 outline-none focus:ring-2 focus:ring-red-500"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-sm"
-            >
-              {showPassword ? "Hide" : "Show"}
+          <header>
+            <h1>{isSignup ? 'Create your account' : 'Back to training'}</h1>
+            <p className="muted">{isSignup ? 'Keep your workouts in one place.' : 'Log in to your training journal.'}</p>
+          </header>
+          <form className="stack" onSubmit={submit}>
+            {isSignup && <label className="field">Name<input name="name" autoComplete="name" required /></label>}
+            <label className="field">Email<input type="email" name="email" autoComplete="email" required /></label>
+            <div className="field">
+              <label htmlFor="auth-password">Password</label>
+              <div className="password-field">
+                <input id="auth-password" type={showPassword ? 'text' : 'password'} name="password"
+                  autoComplete={isSignup ? 'new-password' : 'current-password'} required />
+                <button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} className="icon-button" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                </button>
+              </div>
+            </div>
+            {isSignup && (
+              <label className="field">Confirm password
+                <input type={showPassword ? 'text' : 'password'} name="confirmPassword" autoComplete="new-password" required />
+              </label>
+            )}
+            {error && <p className="notice error" role="alert">{error}</p>}
+            <button className="button primary auth-submit" disabled={submitting}>
+              {submitting ? 'Please wait…' : isSignup ? 'Create account' : 'Log in'}
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
+          </form>
+          <div className="auth-switch">
+            <span className="muted">{isSignup ? 'Already have an account?' : 'New to GymKhanna?'}</span>
+            <button className="text-button" type="button" disabled={submitting} onClick={() => { setIsSignup(!isSignup); setError(''); }}>
+              {isSignup ? 'Log in' : 'Create an account'}
             </button>
           </div>
-
-          {isSignup && (
-            <input
-              type={showPassword ? "text" : "password"}
-              name="confirmPassword"
-              placeholder="Confirm password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              className="w-full bg-[#1c1c1c] text-white rounded-md px-4 py-2.5 outline-none focus:ring-2 focus:ring-red-500"
-            />
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium rounded-md py-2.5 transition flex items-center justify-center gap-2"
-          >
-            {submitting && (
-              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-            )}
-            {submitting ? "Please wait..." : isSignup ? "Sign up" : "Log in"}
-          </button>
-        </form>
-
-        <p className="text-gray-500 text-sm text-center mt-6">
-          {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
-          <button
-            onClick={() => {
-              setIsSignup(!isSignup);
-              setError("");
-            }}
-            className="text-red-500 hover:underline"
-          >
-            {isSignup ? "Log in" : "Sign up"}
-          </button>
-        </p>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
