@@ -10,8 +10,9 @@ export const getMe = () => client.get('/auth/me');
 // Sessions
 export const createSession = (data) => client.post('/sessions', data);
 export const getSessions = () => client.get('/sessions');
-export const getSessionById = (id) => client.get(`/sessions/${id}`);
-export const deleteSession = (id) => client.delete(`/sessions/${id}`);
+export const getLastSets = () => client.get('/sessions/last-sets', { timeout: 3000 });
+export const getSessionById = (id) => client.get(`/sessions/${encodeURIComponent(id)}`);
+export const deleteSession = (id) => client.delete(`/sessions/${encodeURIComponent(id)}`);
 
 // Exercises
 export const getExercises = () => client.get('/exercises');

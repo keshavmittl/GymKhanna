@@ -17,18 +17,11 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center font-sans gap-4 px-6 text-center">
-          <h1 className="text-2xl font-bold">Something went wrong</h1>
-          <p className="text-[#666] text-sm max-w-sm">
-            An unexpected error occurred. Try refreshing the page.
-          </p>
-          <button
-            onClick={() => window.location.href = '/'}
-            className="bg-[#e0322f] hover:bg-[#c92825] text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
-          >
-            Go to Dashboard
-          </button>
-        </div>
+        <main className="screen-status error-screen stack">
+          <h1>Something went wrong</h1>
+          <p className="muted">Try opening the journal again.</p>
+          <a href="/" className="button primary">Open journal</a>
+        </main>
       );
     }
 

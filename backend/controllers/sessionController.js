@@ -3,11 +3,13 @@ import { findPRsForSession ,getAllTimePRs} from '../services/prEngine.js';
 import User from '../models/User.js';
 import { updateStreak } from '../services/streakEngine.js';
 import Exercise from '../models/Exercise.js';
+import { sessionCache } from '../services/sessionCache.js';
+
 const calculateTotalVolume = (exercises) => {
   let total = 0;
   for (const exercise of exercises) {
     for (const set of exercise.sets) {
-      total += set.reps * set.weight;
+      if (set.completed !== false) total += set.reps * set.weight;
     }
   }
   return total;
@@ -25,19 +27,20 @@ export const createSession = async (req, res) => {
       });
     }
 
-    const totalVolume = calculateTotalVolume(exercises);
-
-    const pastSessions = await Session.find({ userId: req.user._id });
-    const prs = findPRsForSession(exercises, pastSessions);
-
-    const session = await Session.create({
+    const session = new Session({
       userId: req.user._id,
       name,
       date: date || Date.now(),
       exercises,
-      totalVolume,
-      prs,
     });
+    await session.validate();
+
+    const pastSessions = await Session.find({ userId: req.user._id });
+    session.totalVolume = calculateTotalVolume(session.exercises);
+    session.prs = findPRsForSession(session.exercises, pastSessions);
+    await session.save();
+
+    await sessionCache.invalidate(req.user._id);
 
     const allSessionsIncludingNew = [...pastSessions, session];
     const streakUpdate = updateStreak(req.user, allSessionsIncludingNew);
@@ -63,7 +66,7 @@ export const createSession = async (req, res) => {
 
 export const getSessions = async (req, res) => {
   try {
-    const sessions = await Session.find({ userId: req.user._id }).sort({ date: -1 });
+    const sessions = await Session.find({ userId: req.user._id }).sort({ date: -1, createdAt: -1, _id: -1 });
 
     res.status(200).json({
       success: true,
@@ -94,6 +97,7 @@ export const deleteSession = async (req, res) => {
       });
     }
 
+    await sessionCache.invalidate(req.user._id);
     res.status(200).json({
       success: true,
       data: null,
@@ -110,16 +114,19 @@ export const deleteSession = async (req, res) => {
 
 export const getPRs = async (req, res) => {
   try {
-    const sessions = await Session.find({ userId: req.user._id });
-    const bodyweightExercises = await Exercise.find({ equipment: 'Bodyweight' }).select('_id');
-    const bodyweightIds = bodyweightExercises.map((ex) => ex._id.toString());
-
-    const allPRs = getAllTimePRs(sessions);
-    const prs = allPRs.filter((pr) => !bodyweightIds.includes(pr.exerciseId.toString()));
+    const data = await sessionCache.read(req.user._id, 'prs', async () => {
+      const [sessions, bodyweightExercises] = await Promise.all([
+        Session.find({ userId: req.user._id }).select('exercises date'),
+        Exercise.find({ equipment: 'Bodyweight' }).select('_id').lean(),
+      ]);
+      const bodyweightIds = new Set(bodyweightExercises.map((ex) => ex._id.toString()));
+      const prs = getAllTimePRs(sessions).filter((pr) => !bodyweightIds.has(pr.exerciseId.toString()));
+      return { prs };
+    });
 
     res.status(200).json({
       success: true,
-      data: { prs },
+      data,
       message: '',
     });
   } catch (error) {
@@ -162,21 +169,21 @@ export const getSessionById = async (req, res) => {
 
 export const getDashboardStats = async (req, res) => {
   try {
-    const sessions = await Session.find({ userId: req.user._id }).sort({ date: -1 });
+    const data = await sessionCache.read(req.user._id, 'stats', async () => {
+      const sessions = await Session.find({ userId: req.user._id })
+        .sort({ date: -1, createdAt: -1, _id: -1 });
 
-    const totalSessions = sessions.length;
-    const totalVolume = sessions.reduce((sum, s) => sum + s.totalVolume, 0);
-    const totalPRs = sessions.reduce((sum, s) => sum + s.prs.length, 0);
-    const recentSessions = sessions.slice(0, 5);
+      return {
+        totalSessions: sessions.length,
+        totalVolume: sessions.reduce((sum, session) => sum + session.totalVolume, 0),
+        totalPRs: sessions.reduce((sum, session) => sum + session.prs.length, 0),
+        recentSessions: sessions.slice(0, 5),
+      };
+    });
 
     res.status(200).json({
       success: true,
-      data: {
-        totalSessions,
-        totalVolume,
-        totalPRs,
-        recentSessions,
-      },
+      data,
       message: '',
     });
   } catch (error) {
@@ -185,5 +192,46 @@ export const getDashboardStats = async (req, res) => {
       data: null,
       message: error.message,
     });
+  }
+};
+
+export const getLastSets = async (req, res) => {
+  try {
+    const exercises = await Session.aggregate([
+      { $match: { userId: req.user._id } },
+      { $sort: { date: -1, createdAt: -1, _id: -1 } },
+      { $unwind: '$exercises' },
+      {
+        $project: {
+          exerciseId: '$exercises.exerciseId',
+          sets: {
+            $filter: {
+              input: { $ifNull: ['$exercises.sets', []] },
+              as: 'set',
+              cond: {
+                $and: [
+                  { $ne: ['$$set.completed', false] },
+                  { $isNumber: '$$set.weight' },
+                  { $gte: ['$$set.weight', 0] },
+                  { $isNumber: '$$set.reps' },
+                  { $gt: ['$$set.reps', 0] },
+                ],
+              },
+            },
+          },
+        },
+      },
+      { $match: { exerciseId: { $type: 'objectId' }, 'sets.0': { $exists: true } } },
+      { $group: { _id: '$exerciseId', sets: { $first: '$sets' } } },
+    ]);
+
+    const lastSets = Object.fromEntries(exercises.map(({ _id, sets }) => [
+      _id.toString(),
+      sets.map(({ weight, reps }) => ({ weight, reps })),
+    ]));
+
+    res.status(200).json({ success: true, data: { lastSets }, message: '' });
+  } catch {
+    res.status(500).json({ success: false, data: null, message: 'Could not load previous sets' });
   }
 };
