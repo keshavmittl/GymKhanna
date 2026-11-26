@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 
 const LINKS = [
   { to: '/', label: 'Journal', icon: House },
-  { to: '/new-session', label: 'Log workout', icon: Plus },
+  { to: '/new-session', label: 'Log workout', compactLabel: 'Log', icon: Plus },
   { to: '/history', label: 'History', icon: History },
   { to: '/progress', label: 'Progress', icon: ChartNoAxesCombined },
   { to: '/bodyweight', label: 'Weight', icon: Scale },
@@ -28,15 +28,18 @@ export default function Navbar() {
     <aside className="sidebar">
       <Link to="/" className="brand"><span className="brand-mark"><Dumbbell size={19} aria-hidden="true" /></span>GymKhanna</Link>
       <nav className="nav-list" aria-label="Main navigation">
-        {LINKS.map(({ to, label, icon: Icon }) => (
+        {LINKS.map(({ to, label, compactLabel, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
             end
+            aria-label={label}
             className={({ isActive }) => isActive || (to === '/history' && pathname.startsWith('/session/'))
               ? 'nav-link active' : 'nav-link'}
           >
-            <Icon size={19} strokeWidth={1.8} aria-hidden="true" /><span>{label}</span>
+            <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
+            <span className={compactLabel ? 'nav-label-wide' : undefined} aria-hidden="true">{label}</span>
+            {compactLabel && <span className="nav-label-compact" aria-hidden="true">{compactLabel}</span>}
           </NavLink>
         ))}
       </nav>

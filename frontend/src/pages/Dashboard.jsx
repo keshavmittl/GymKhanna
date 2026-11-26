@@ -25,8 +25,8 @@ export default function Dashboard() {
 
   const metrics = [
     { label: 'Workouts logged', value: stats?.totalSessions, icon: Dumbbell },
-    { label: 'Total volume', value: stats && `${number.format(stats.totalVolume)} kg`, icon: Weight },
-    { label: 'PRs hit', value: stats?.totalPRs, icon: Trophy },
+    { label: 'Total volume', value: stats && number.format(stats.totalVolume), unit: 'kg', icon: Weight },
+    { label: 'Records set', value: stats?.totalPRs, icon: Trophy },
   ];
   const latest = stats?.recentSessions[0];
 
@@ -45,12 +45,11 @@ export default function Dashboard() {
 
       <div className="dashboard-top">
         <StreakWidget />
-        <section aria-label="Training totals" className="metric-grid">
-          {metrics.map(({ label, value, icon: Icon }) => (
+        <section aria-label="Training totals" className="panel metric-grid">
+          {metrics.map(({ label, value, unit, icon: Icon }) => (
             <div className="metric" key={label}>
-              <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
-              <p className="muted small">{label}</p>
-              <strong>{value ?? '—'}</strong>
+              <p className="metric-label"><Icon size={16} strokeWidth={1.8} aria-hidden="true" /> {label}</p>
+              <strong>{value ?? '—'}{value != null && unit && <span className="metric-unit">{unit}</span>}</strong>
             </div>
           ))}
         </section>

@@ -38,15 +38,14 @@ export default function Login() {
 
   return (
     <main className="auth-page">
-      <div className="auth-photo" aria-hidden="true" />
       <div className="auth-main">
         <div className="auth-inner">
           <div className="brand auth-brand">
             <span className="brand-mark"><Dumbbell size={20} aria-hidden="true" /></span>GymKhanna
           </div>
           <header>
-            <h1>{isSignup ? 'Create your account' : 'Back to training'}</h1>
-            <p className="muted">{isSignup ? 'Keep your workouts in one place.' : 'Log in to your training journal.'}</p>
+            <h1>{isSignup ? 'Create your account' : 'Log in'}</h1>
+            <p className="muted">{isSignup ? 'Start your training journal.' : 'Open your training journal.'}</p>
           </header>
           <form className="stack" onSubmit={submit}>
             {isSignup && <label className="field">Name<input name="name" autoComplete="name" required /></label>}
@@ -80,6 +79,7 @@ export default function Login() {
           </div>
         </div>
       </div>
+      <div className="auth-photo" aria-hidden="true" />
     </main>
   );
 }

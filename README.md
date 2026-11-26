@@ -203,6 +203,12 @@ gymkhanna/
 
 ---
 
+## Visual credits
+
+Gym photography by Benjamin Brunner. [Original photograph](https://unsplash.com/photos/a-black-and-white-photo-of-a-barbell-in-a-gym-wcOGQeT1jIw) · [Unsplash License](https://unsplash.com/license)
+
+Barlow Condensed by the Barlow Project Authors. [Font license](frontend/public/fonts/barlow-condensed-OFL.txt)
+
 ## Author
 
 **Keshav Mittal**  
