@@ -137,6 +137,22 @@ GET http://localhost:5001/api/health
 → { "success": true, "data": { "status": "ok" }, "message": "" }
 ```
 
+### Interview demo account
+
+With your local API running, create a fresh account with sample workouts, weigh-ins, goals, and water intake.
+
+```bash
+DEMO_NAME="Your Name" npm --prefix backend run seed:interview
+```
+
+The command prints the new demo email and password. It uses `http://localhost:5001/api` by default.
+Set `DEMO_API_URL` for a different preview port, and optionally set `DEMO_EMAIL` or `DEMO_PASSWORD`.
+The seeder adds data only to a newly created account. It rejects an existing email.
+If you use a temporary preview database, rerun the seed when you restart that database.
+
+The sample history shows six completed training weeks and the current week's sessions so far.
+In the interview, start on Progress, search History for Bench Press, and select the exercise in Log workout to show the last working set prefilled. Use the sample history to explain how the app works and use your own records for personal progress figures.
+
 ---
 
 ## API Overview
