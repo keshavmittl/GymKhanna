@@ -177,7 +177,7 @@ ACCESS_TOKEN_EXPIRES_IN=15m
 REFRESH_TOKEN_SECRET=<random 64-byte hex>   # reserved for future HMAC refresh tokens
 REFRESH_TOKEN_EXPIRES_IN=7d
 
-# Legacy — kept for compatibility, not used by new auth code
+# Optional fallback when ACCESS_TOKEN_SECRET is unset
 JWT_SECRET=<original secret>
 
 CLIENT_URL=http://localhost:5173   # must match frontend origin

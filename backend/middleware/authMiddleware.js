@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { getAccessTokenSecret } from '../services/accessTokenSecret.js';
 
 export const protect = async (req, res, next) => {
   try {
@@ -16,7 +17,7 @@ export const protect = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+      decoded = jwt.verify(token, getAccessTokenSecret());
     } catch (jwtErr) {
       // Distinguish expired tokens from genuinely invalid ones so the
       // frontend interceptor can decide whether to attempt a refresh.

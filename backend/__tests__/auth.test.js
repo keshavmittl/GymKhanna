@@ -23,6 +23,7 @@ import jwt from 'jsonwebtoken';
 
 // ─── minimal env before importing app code ─────────────────────────────────
 process.env.ACCESS_TOKEN_SECRET  = 'test_access_secret';
+process.env.JWT_SECRET           = 'test_existing_jwt_secret';
 process.env.REFRESH_TOKEN_SECRET = 'test_refresh_secret';
 process.env.ACCESS_TOKEN_EXPIRES_IN  = '15m';
 process.env.REFRESH_TOKEN_EXPIRES_IN = '7d';
@@ -151,6 +152,37 @@ describe('POST /api/auth/login', () => {
     const res = await request(app).post('/api/auth/login').send({ email: SIGNUP_PAYLOAD.email });
     expect(res.status).toBe(400);
   });
+});
+
+test('an existing JWT_SECRET deployment can log in, verify access, and rotate its refresh token', async () => {
+  await registerAndLogin();
+  const accessSecret = process.env.ACCESS_TOKEN_SECRET;
+  const previousLegacySecret = process.env.JWT_SECRET;
+  delete process.env.ACCESS_TOKEN_SECRET;
+  process.env.JWT_SECRET = 'test_legacy_render_signing_secret';
+
+  try {
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ email: SIGNUP_PAYLOAD.email, password: SIGNUP_PAYLOAD.password })
+      .expect(200);
+    const token = login.body.data.token;
+    await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`).expect(200);
+
+    const cookie = extractRefreshCookie(login);
+    expect(cookie).not.toBeNull();
+    const rotated = await request(app).post('/api/auth/refresh').set('Cookie', `refreshToken=${cookie}`).expect(200);
+    const rotatedCookie = extractRefreshCookie(rotated);
+    expect(rotatedCookie).not.toBeNull();
+    expect(rotatedCookie).not.toBe(cookie);
+    await request(app).get('/api/auth/me')
+      .set('Authorization', `Bearer ${rotated.body.data.token}`)
+      .expect(200);
+  } finally {
+    process.env.ACCESS_TOKEN_SECRET = accessSecret;
+    if (previousLegacySecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previousLegacySecret;
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

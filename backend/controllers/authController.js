@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { getAccessTokenSecret } from '../services/accessTokenSecret.js';
 import RefreshToken from '../models/RefreshToken.js';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -15,7 +16,7 @@ const hashToken = (raw) =>
 
 /** Sign a short-lived JWT access token. */
 const signAccessToken = (userId) =>
-  jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
+  jwt.sign({ userId }, getAccessTokenSecret(), {
     expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || '15m',
   });
 
